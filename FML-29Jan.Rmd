@@ -1,0 +1,72 @@
+---
+title: "FML - Jan29th"
+author: "Aamir Sohaib"
+date: "2026-01-29"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+library(readr)
+filtered_data <- read_csv("/Users/roc/Downloads/filtered_data.csv") 
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+```
+
+
+```{r}
+
+#I have dataset of S&P 500 companies with their sectors, share price and other financial indicators.I import the dataset into R Studio to utilize information for assignment purpose. I will first use "head" to understand it.
+
+head(filtered_data)
+#Data has both qualitative and quantitative measures in it e.g P/E ratio as a quantitative element and sector as qualitative element. Data has been sourced from the link below;
+#https://datahub.io/core/s-and-p-500-companies-financials
+
+```
+
+```{r}
+#I will then fetch summary to look at the main components. As the dataset is too large, summary function will provide main factors in data.
+summary(filtered_data)
+```
+
+```{r}
+#I will take earning/share of few companies
+alpha<- filtered_data$`Earnings/Share`[11:50]
+print(alpha)
+```
+
+```{r}
+#I now sort the EPS in ascending order.
+sort(alpha)
+```
+
+```{r}
+#I now create a data frame, which has 2 components. Name of first 5 companies in dataset and their Dividend Yield respectively.
+data.frame(filtered_data$Name[1:5], filtered_data$`Dividend Yield`[1:5])
+```
+
+```{r}
+#I will now plot the share price of all index companies to have a look at trend and outliers.
+
+price_plot<- plot(filtered_data$Price)
+```
+
+```{r}
+#I will now plot EPS with P/E ratio in scatterplot to look at the trend of companies.
+
+EPS<- filtered_data$`Earnings/Share`
+PE<- filtered_data$`Price/Earnings`
+
+plot(x=EPS, y=PE, main="EPS vs PE ratio", xlab= "EPS", ylab= "PE ratio", col=blues9)
+```
+
+```{r}
+#I will now plot share price of index to see relation between 52 weeks low and 52 weeks high prices.
+low<- filtered_data$`52 Week Low`
+high<- filtered_data$`52 Week High`
+plot(x=low, y=high, main= "52 weeks low-high relation", xlab= "52 weeks low", ylab= "52 weeks high", col=blues9)
+```
