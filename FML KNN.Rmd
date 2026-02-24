@@ -1,0 +1,172 @@
+---
+title: "FML- KNN"
+author: "Aamir Sohaib"
+date: "2026-02-18"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(gmodels)
+library(class)
+```
+
+###Answer:1
+
+```{r}
+#after importing dataset for my project, I will use summary function to know the data and look at the important things and figures.
+UniversalBank_1 <- read.csv("/Users/roc/Downloads/UniversalBank-1.csv")
+summary(UniversalBank_1)
+```
+
+```{r}
+#Zip code and ID is not the predictor, so I'll remove these two items first from data.
+clean<- UniversalBank_1[, c(-1,-5)]
+colnames(clean)<- make.names(colnames(clean))
+```
+
+```{r}
+#here I will create dummy variables for categorical values that are being used to predict.
+clean$Education<- as.factor(clean$Education)
+dummy_func<- dummyVars(Personal.Loan ~., data = clean)
+data_predictors<- as.data.frame(predict(dummy_func,clean))
+data_transformed<- cbind(data_predictors, Personal.Loan = clean$Personal.Loan)
+```
+
+```{r}
+#I'll partition the data as required in question i.e. 60% training and 40% validation.
+set.seed(1)
+train_index<- createDataPartition(data_transformed$Personal.Loan, p=0.6, list = FALSE)
+train<- data_transformed[train_index,]
+valid<- data_transformed[-train_index, ]
+```
+
+```{r}
+#I'll now add new customer data
+new_customer<- data.frame(Age =40, Experience = 10,Income =84, Family =2, 
+  CCAvg = 2,  Education.1 =0,Education.2 = 1,Education.3 =0, Mortgage =0, 
+  Securities.Account =0, CD.Account = 0,Online =1, CreditCard = 1)
+```
+
+```{r}
+#now I'll use normalization process.
+new_customer$Personal.Loan <- 0
+norm_model<- preProcess(train,method = "range")
+
+#apply normalization
+train_norm<- predict(norm_model, train)
+valid_norm<- predict(norm_model, valid)
+new_customer_norm<- predict(norm_model, new_customer)
+new_customer_norm$Personal.Loan <- NULL
+```
+
+```{r}
+#predictors
+train_x <- train_norm[,!(names(train_norm)%in% "Personal.Loan")]
+valid_x<-valid_norm[,!(names(valid_norm) %in%"Personal.Loan")]
+new_x <- new_customer_norm[, !(names(new_customer_norm) %in%"Personal.Loan")]
+
+#labels
+train_y <-train_norm$Personal.Loan
+valid_y <-valid_norm$Personal.Loan
+```
+
+```{r}
+#Now finally i'll use KNN
+prediction<- knn(train = train_x,
+                  test = new_x,
+                  cl = train_y,
+                  k = 1)
+
+prediction
+```
+
+###Answer:2
+
+```{r}
+#It's common to check odd numbers to avoid ties.
+search_grid <- expand.grid(k = seq(1, 25, 1))
+
+#now i'll run the model using caret. We use the KNN method and specify the range normalization within the function
+#I had to onvert the target variable to factor in both sets, without it my model was giving me regression results including MSE etc instead of accuracy and Kappa.
+
+train$Personal.Loan<- as.factor(train$Personal.Loan)
+valid$Personal.Loan<- as.factor(valid$Personal.Loan)
+
+set.seed(1)
+model_tuned<- train(Personal.Loan ~ .,data =train, method = "knn", tuneGrid =search_grid,
+                     preProcess ="range")
+
+#now i'll print the results to see what is the optimal value.
+print(model_tuned)
+```
+
+###Answer:3
+
+```{r}
+#Get predictions for validation set using tuned model in Q2
+valid_predicts<- predict(model_tuned, valid)
+
+#I'll plot values as follow'
+#x=Actual values from valid set
+#y=Predicted values from model
+CrossTable(x= valid$Personal.Loan, 
+           y =valid_predicts, 
+           prop.chisq= FALSE)
+```
+
+###Answer:4
+```{r}
+#model_tuned already contains best k and normalization, I can apply it directly to new_customer data created earlier.
+predict_best_k <- predict(model_tuned,new_customer)
+print(predict_best_k)
+```
+
+###Answer:5
+```{r}
+#I will set aside 50% of data for training first
+set.seed(1)
+trainIndex2<- createDataPartition(data_transformed$Personal.Loan, p= 0.5, list = FALSE)
+train_data<- data_transformed[trainIndex2, ]
+remaining_data<- data_transformed[-trainIndex2, ]
+
+#Now I'll split remaining 50% into validation and test
+#30% is 0.6 of remaining 50%
+
+validIndex2 <- createDataPartition(remaining_data$Personal.Loan, p= 0.6, list = FALSE)
+valid_data<-remaining_data[validIndex2, ]
+test_data<- remaining_data[-validIndex2, ]
+```
+
+```{r}
+#Now I'll normalize all sets and -14 is the number of column we remove as Personal.Loan is located in 14th column.
+prepro<- preProcess(train_data[, -14],method = "range")
+train_alpha<- predict(prepro, train_data[,-14])
+valid_alpha<- predict(prepro,valid_data[, -14])
+test_alpha<- predict(prepro, test_data[,-14])
+
+#now i'll run KNN using the Best k=1, calculated earlier
+best_k <- 1
+knn_test<- knn(train = train_alpha, test= test_alpha, cl = train_data$Personal.Loan, k = best_k)
+knn_train<- knn(train = train_alpha, test = train_alpha, cl = train_data$Personal.Loan, k = best_k)
+knn_valid<- knn(train = train_alpha, test = valid_alpha, cl = train_data$Personal.Loan, k = best_k)
+```
+
+```{r}
+
+#plotting confusion matrix
+CrossTable(x= test_data$Personal.Loan, y= knn_test, prop.chisq = FALSE)
+```
+We observe highest accuracy and performance metrics on the Training set.
+kNN retains training data. When model generates predictions based on training data, "neighbors" it identifies are precisely the data points it is already familiar with, resulting in overly positive outcomes. High level of training accuracy paired with considerably lower validation/test accuracy indicates overfitting, particularly if a small value of k was utilized.
+
+The outcomes should be fairly comparable; however, the Validation set may exhibit marginally superior performance compared to Test set. Validation set was utilized to fine-tune the model i.e. select the optimal value. Consequently, the model is "refined" for that particular dataset.Test set serves as ultimate, impartial evaluator. It embodies data that model has never encountered and was not employed in determining k value. This provides the most accurate anticipation of how model will function with new bank clients in the future.
+ 
+False Negatives: In context of a bank loan, false negative signifies missed opportunity for the financial institution.
+
+False Positives: A false positive leads to unnecessary marketing expenditures.
+
+Overall Accuracy: Significant decline in accuracy from Training set indicates that the model is having difficulty generalizing to new data.
