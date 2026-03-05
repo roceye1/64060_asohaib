@@ -1,0 +1,128 @@
+---
+title: "FML-04/03"
+author: "Aamir Sohaib"
+date: "2026-03-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(gmodels)
+library(e1071)
+```
+
+#I will first load the raw dataset into R studio to perform my analysis and work.
+```{r}
+raw_dataset<- read.csv("~/Downloads/UniversalBank-1.csv")
+```
+
+#I will now partition the data as per instructed, i.e. 60% training and 40% validation.
+```{r}
+
+set.seed(1) 
+train.index<- createDataPartition(raw_dataset$Personal.Loan, p = 0.6, list = FALSE)
+train.data<- raw_dataset[train.index, ]
+valid.data<- raw_dataset[-train.index, ]
+```
+
+###Solution: A
+
+#Now I will create pivot table
+```{r}
+pivot_table <- table(train.data$CreditCard, train.data$Personal.Loan, train.data$Online)
+dimnames(pivot_table) <- list(CC = c("0", "1"), Loan = c("0", "1"), Online = c("0", "1"))
+print(pivot_table)
+```
+
+###Solution: B
+
+#Now I will create the probability that customer will accept the loan.
+
+```{r}
+numerator<- pivot_table["1","1","1"]
+denominator<- sum(pivot_table["1", , "1"])
+probability<- numerator / denominator
+print(probability)
+```
+
+###Solution:C
+
+#I will create 2 tables, in table 1: Loan vs Online, in table 2 : Loan vs CC
+
+```{r}
+table_online<- table(train.data$Personal.Loan, train.data$Online)
+print(table_online)
+
+table_cc<- table(train.data$Personal.Loan, train.data$CreditCard)
+print(table_cc)
+```
+
+###Solution: D
+
+#I will calculate probabilities of different matchings as required in assignment. I'll name each probability as "prob" and number of probability assigned in assignmnet as "1,2,3" etc.
+
+```{r}
+
+prob1 <- sum(train.data$CreditCard==1 &  train.data$Personal.Loan==1)/sum(train.data$Personal.Loan==1)
+print(prob1)
+```
+```{r}
+prob2 <- sum(train.data$Online==1 & 
+train.data$Personal.Loan==1)/ sum(train.data$Personal.Loan==1)
+print(prob2)
+```
+
+```{r}
+prob3 <- sum(train.data$Personal.Loan==1)/nrow(train.data)
+print(prob3)
+```
+
+```{r}
+prob4 <- sum(train.data$CreditCard==1 & train.data$Personal.Loan==0)/ sum(train.data$Personal.Loan==0)
+print(prob4)
+```
+
+```{r}
+prob5<- sum(train.data$Online==1 & train.data$Personal.Loan==0)/
+sum(train.data$Personal.Loan==0)
+print(prob5)
+```
+
+```{r}
+prob6 <- sum(train.data$Personal.Loan==0)/nrow(train.data)
+print(prob6)
+```
+
+###Solutions : E
+
+#I will now calculate Naive Bayes Probability using quantities computed above. I will keep prob1, prob2, prob3 as numirator where value of Loan=1, while in denominator I will use prob4, prob5, prob6 where value of Loan=0 and then embed these value in formula to get Naive Bayes Probability.
+
+```{r}
+NB1<- prob1 * prob2 * prob3
+NB2<- prob4 * prob5 * prob6
+naive.bayes<- NB1/(NB1+NB2)
+print(naive.bayes)
+```
+
+### Solution: F
+
+Direct calculation = 9.1%
+Naive Bayes Calculation = 9% 
+
+Direct Calculation provides more precise estimate for this particular training set. This is due to its utilization of actual counts of specific predictor profile without relying on any assumptions.
+We studies in class that ""Naive Bayes assumes all features are independent given the class label." Naive Bayes estimate presumes that Credit Card and Online usage are independent of one another, given the Loan status. Although this assumption enables the model to perform effectively with extensive or intricate data sets where exact matches are infrequent, it does introduce a minor bias in the probability estimate for any particular profile.
+
+###Solution: G
+
+```{r}
+nb.model<- naiveBayes(Personal.Loan~ CreditCard+Online, data = train.data)
+print(nb.model)
+```
+
+```{r}
+new.compute<- data.frame(CreditCard=1, Online=1)
+prediction<- predict(nb.model, new.compute, type = "raw")
+print(prediction)
+```
+Predict function gives us 2 values in 2 columns, 0 = no loan and 1= loan. The probability in column 1 gives us a very close match to what we obtained in solution E using Naive Bayes formula i.e. 0.090 or 9% which indicates that R function follows same strategy of assuming conditional independence to calculate posterior probability. Direct calculation gave us the value of 9.1% which is slightly different from Naive Bayes, which is because of generalized model rather than specific matching records in dataset.
