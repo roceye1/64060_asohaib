@@ -1,0 +1,132 @@
+---
+title: "FML - 23 Apr"
+author: "Aamir Sohaib"
+date: "2026-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(cluster)
+```
+
+
+```{r}
+cereals_data <- read.csv("/Users/roc/Downloads/Cereals-1.csv")
+head(cereals_data)
+```
+
+***Data Processing***
+
+```{r}
+clean_data <- na.omit(cereals_data)
+rownames(clean_data) <- clean_data$name
+print(paste("Cereals after removing missing values:", nrow(clean_data) ))
+```
+
+***Normalise Data***
+
+```{r}
+numeric_data <- clean_data[, 4:16]
+scaled_data <- scale(numeric_data)
+```
+
+***Comparing Linkage Methods using Agnes***
+
+```{r}
+methods <- c("single", "complete", "average", "ward")
+values <- sapply(methods, function(m) {agnes(scaled_data, method=m)$ac})
+print("Agglomerative Coefficients (higher number = better clustering):")
+print(round(values, 4))
+```
+***Ward’s method was chosen as best linkage method because it gave highest coefficient, showing strongest clustering structure among four methods we compared.***
+
+```{r}
+chosen_method <- "ward"
+hc_ward <- agnes(scaled_data, method = chosen_method)
+dendrogram <- pltree(hc_ward, cex=0.6, hang = -1, main= "Ward's Method")
+plot_dendrogram <- rect.hclust(as.hclust(hc_ward), k = 5, border = 1:5)
+```
+
+I selected 5 clusters. Dendrogram illustrates significant and noticeable increase in height following fifth merge. This suggests that any additional merging would amalgamate distinctly different groups. 5 cluster solution also yields balanced cluster sizes and highly interpretable nutritional profiles, rendering it the most practical option for business interpretation.
+
+```{r}
+k <- 5
+clusters <- cutree(as.hclust(hc_ward), k = 5)
+cat("Number of cereals in each cluster:\n")
+print(table(clusters))
+```
+
+```{r}
+cluster_summary <- aggregate(numeric_data, list(clusters), mean)
+print("Cluster Profiles (means):")
+print(round(cluster_summary, 2))
+```
+
+**5 clusters reveal a clear and logical market structure**
+
+Cluster 1= (Premium Healthy): Lowest calories (63), highest fiber (11g), highest potassium (310mg), highest rating (73.84), and very low sugar(3.67). This is ultra healthy group.
+
+Cluster 2: (Heavier/Higher-Calorie): Highest calories (124), moderate fiber and rating. Represents denser, more filling cereals.
+
+Cluster 3: (Sugar rich Cereals): Highest sugar(11.29g), lowest fiber(0.57g), and lowest rating (28.85). Typical of sweetened cereals.
+
+Cluster 4: (Mainstream High Carb – 21): Highest sodium(226mg) and carbohydrates(18.48g). The largest mainstream segment.
+
+Cluster 5: (Light & Natural): Very low calories(82), extremely low fat (0.11) and sodium (1.67), low sugar (2.33), high rating(63). Includes puffed and light options.
+
+Analysis clearly separates health focused, kids targeted, mainstream, and natural products.
+
+
+```{r}
+set.seed(42)
+
+n <- nrow(scaled_data)
+train_idx <- sample(1:n, size = round(0.7 * n))
+partA <- scaled_data[train_idx, ]
+partB <- scaled_data[-train_idx, ]
+
+hc_A <- agnes(partA, method = "ward")
+clusters_A <- cutree(as.hclust(hc_A), k = k)
+centroids_A <- aggregate(partA, list(clusters_A), mean)[, -1]
+
+assign_clusters <- function(data, centroids) {
+  dists <- as.matrix(dist(rbind(centroids, data)))
+  dists <- dists[(nrow(centroids) + 1):nrow(dists), 1:nrow(centroids)]
+  apply(dists, 1, which.min)}
+
+clusters_B_from_A <- assign_clusters(partB, centroids_A)
+full_clusters_B <- clusters[-train_idx]
+agreement_table <- table(clusters_B_from_A, full_clusters_B)
+print("Consistency Table (Part B assignment vs Full-data clustering):")
+print(agreement_table)
+max_agreement <- sum(apply(agreement_table, 1, max)) / sum(agreement_table) * 100
+cat("\nAgreement percentage (after fixing label switching):", round(max_agreement, 1), "%\n")
+```
+
+Stability test (70/30) demonstrates exceptional robustness. When Part B (30%) was assigned using centroids from Part A, the agreement after optimal label matching achieved 100%. Consistency table verifies nearly perfect alignment, indicating that 5 cluster structure is extremely stable and dependable.
+
+```{r}
+
+healthy_id <- cluster_summary$Group.1[which.max(cluster_summary$fiber)]
+healthy_cereals <- rownames(clean_data)[clusters == healthy_id]
+print("Recommended Healthy Cereals for School Cafeterias:")
+print(healthy_cereals)
+```
+
+***Recommended cluster***
+Cluster 1 (Premium Healthy– only 3 cereals). This is ideal healthy cereal cluster because it offers:
+1- Highest fiber– supports digestion and satiety.
+2- Highest potassium and protein.
+3- Lowest sugar of all clusters.
+4- Highest consumer rating.
+
+**Cereals in this cluster**
+All Bran with extra fiber and two other ultra high fiber cereals.
+Recommendation: Although small, this cluster exemplifies the gold standard for nutritional quality. Schools should incorporate all three and rotate them regularly. They fully support a healthy diet while remaining acceptable to children.
+
+In conclusion, the five-cluster solution utilizing Ward’s method offers clear, stable, and actionable market segments that can directly inform school nutrition programs and product development strategies.
+
+***Data Normalisation: Yes, normalization is mandatory***
+
+Euclidean distance is highly sensitive to scale. Variables such as sodium and fiber exhibit vastly different ranges. Without standardization, sodium and calories would dominate distance calculations and create distorted clusters. By applying scale to all numeric variables, every nutritional attribute contributes equally, resulting in the clear segments presented above.
