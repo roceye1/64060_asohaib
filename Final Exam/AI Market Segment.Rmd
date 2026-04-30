@@ -1,0 +1,150 @@
+---
+title: "DataDriven Approach to Global AI Hiring Market"
+author: "Aamir Sohaib"
+date: "April30, 2026"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(ggplot2)
+library(knitr)
+
+# I loaded the data here at top so all chunks can use it and make report more presentable.
+data_file<- read.csv("/Users/roc/Downloads/data.csv")
+data_file$scaled_index<-scale(data_file$Relative_AI_hiring_index_pct)
+
+set.seed(123)
+model <- kmeans(data_file$scaled_index, centers = 3, nstart = 25)
+data_file$cluster<- as.factor(model$cluster)
+
+cluster_means <-data_file %>% 
+  group_by(cluster) %>% 
+  summarise(m=mean(Relative_AI_hiring_index_pct)) %>%
+  arrange(desc(m))
+
+label_map<- setNames(
+  c("High Intensity Expansion","Stable Core Markets","Cooling"),
+  cluster_means$cluster)
+data_file$cluster_label<-label_map[as.character(data_file$cluster)]
+```
+
+***Summary***
+
+This report outlines a data driven strategy for managing recruitment investments within unpredictable global AI talent market, which has become very dynamic in recent years. By employing K-Means clustering on seven years of actual hiring data (2018–2025), I have categorized global markets into three distinct strategic zones. Resulting framework offers clear and actionable recommendations for optimizing talent acquisition budgets in 2025 and beyond.
+
+***1. Objectives***
+
+**The Problem**  
+Global Artificial Intelligence job market is extremely volatile. Senior leadership encounters considerable difficulties in determining optimal timing and geographic distribution of recruitment resources, which often leads to missed opportunities during periods of growth and inefficient expenditures during market downturns.
+
+**The Goal**  
+Utilize machine learning (K-Means clustering) on historical hiring data to pinpoint natural market segments based on hiring intensity. This segmentation provides an objective, evidence based framework for making strategic talent investment decisions, which lowers operative expenses eventually and maximize shareholder's wealth.
+
+***2. Data Source and Real-World Validation***
+
+The analysis is based on Global AI Hiring Index published by OECD.AI. This dataset captures actual monthly variations in AI-related job postings across four key markets i.e. Luxembourg, Ireland, Switzerland, and Germany, from January 2018 to February 2025.  
+
+This dataset meets the real-world requirement as it reflects authentic economic conditions, including the impact of the 2020 pandemic and significant market cooling observed in 2023, followed by the recovery in 2024–2025. Presence of natural volatility and country specific trends confirms that the data is not synthetic.
+
+***3. Methodology***
+
+K-Means clustering was chosen as the most suitable method for addressing this business issue, as it facilitates the identification of inherent groupings without the need for pre defined categories.
+
+Data preparation process included converting reference date into a standardized format and normalizing the hiring index values to guarantee equal importance in distance computations. Ideal number of clusters was established using Elbow Method, which revealed a definitive solution at **K = 3**. These three clusters were then categorized as **High Intensity Expansion**, **Stable Core Markets**, and **Cautionary or Cooling** zones based on their average hiring intensity.
+
+```{r, fig.width=7,fig.height=4.5}
+fviz_nbclust(data_file$scaled_index, kmeans, method ="wss") +
+  geom_vline(xintercept =3,linetype =2,color = "red",linewidth=1)+
+  labs(
+    title ="Elbow Method for Optimal Number of Clusters",
+    subtitle="The red line indicates the chosen K = 3",
+    x= "Number of Clusters",
+    y= "Total Within-Cluster Sum of Squares (WSS)")
+```
+
+***4. Analysis and Results***
+
+**Cluster Profile Summary**
+
+Following table presents average hiring intensity, number of months, and data distribution across three strategic zones.
+
+```{r}
+summary_table<- data_file %>%
+  group_by(cluster_label) %>%
+  summarise(
+    Average_Hiring_Index=round(mean(Relative_AI_hiring_index_pct), 2),
+    Number_of_Months=n(),
+    Percentage_of_Data=round(n()/nrow(data_file)*100,1)) %>%
+  arrange(desc(Average_Hiring_Index))
+
+kable(summary_table, col.names = c("Strategic Zone", "Average Hiring Index (%)", "Months", "% of Data"), caption = "Cluster Profile Summary Table")
+```
+
+**Cluster Profile Visualization**
+
+Bar chart below illustrates average hiring intensity across three zones, providing clear visual comparison of talent demand strength.
+
+```{r, fig.width=8, fig.height=6}
+ggplot(data_file, aes(x = cluster_label, y = Relative_AI_hiring_index_pct, fill = cluster_label)) + geom_bar(stat ="summary",fun = "mean", width = 0.6) +
+  geom_text(stat= "summary",fun= "mean",aes(label = after_stat(round(y, 1))), 
+  vjust = -0.5,size = 5,fontface= "bold") +scale_fill_manual(values = c(
+    "High Intensity Expansion"= "#2E8B57",
+    "Stable Core Markets"     = "#4682B4",
+    "Cooling"    = "#CD5C5C")) +
+  theme_minimal() +labs(
+    title = "Average AI Hiring Intensity by Strategic Zone",
+    subtitle = "Higher values indicate stronger talent demand",
+    x ="Strategic Zone",
+    y ="Average Relative AI Hiring Index (%)") +
+  theme(legend.position = "none",axis.text.x = element_text(size = 11))
+```
+
+**AI Hiring Trends by Strategic Zone (2018–2025)**
+
+Line chart displays how each country transitioned between three strategic zones over seven year period, highlighting periods of expansion, stability, and cooling.
+
+```{r, fig.width=10, fig.height=6}
+ggplot(data_file,aes(x= as.Date(paste0(ref_date, "01"), "%Y%m%d"), 
+      y = Relative_AI_hiring_index_pct, color = cluster_label)) +
+  geom_line(linewidth =0.8) +geom_point(size = 1.5, alpha = 0.7)+
+  facet_wrap(~ Country_label,scales = "free_y") +theme_minimal()+
+  scale_color_manual(values = c(
+    "High Intensity Expansion" = "#2E8B57",
+    "Stable Core Markets" = "#4682B4",
+    "Cooling"= "#CD5C5C"))+
+  labs(
+    title = "Global AI Talent Demand by Strategic Zone (2018–2025)",
+    subtitle= "Green = High-Intensity | Blue = Stable | Red = Cooling",
+    x ="Year",
+    y ="Relative AI Hiring Index (%)",
+    color = "Strategic Zone") +theme(legend.position= "bottom")
+```
+
+**Key Insights:**
+
+- Ireland has shown the most significant recovery, with most months in 2024–2025 categorized within the High Intensity zone.
+- The year 2023 marked a distinct cooling phase across the market in all four countries.
+- Luxembourg displayed greatest volatility, often transitioning between different zones.
+- Germany predominantly remained within the Stable Core Markets zone, suggesting a lower risk and stable hiring environment.
+
+***5. Conclusions and Recommendations***
+
+The K-Means clustering method effectively converted intricate monthly hiring data into three strategic zones that can be acted upon, facilitating informed talent investment choices.
+
+***Strategic Recommendations for 2025:***
+
+1. **High Intensity Expansion Zones**  
+   Significantly boost recruitment budgets when markets are in this zone. Special attention should be directed towards Ireland and Luxembourg during 2025-2026 time frame to secure high value talent before competitors do.
+
+2. **Stable Core Markets**  
+   Sustain steady and reliable hiring processes. Germany is characterized as a dependable, lower risk setting ideal for long term team development.
+
+3. **Cautionary or Cooling Zones**  
+   Limit aggressive external hiring during these times to safeguard the budget. Shift focus towards internal talent development and retention strategies. Keeping operating expenses lower in this period will help company maintain its budget for future hiring.
+
+**Limitations**  
+This analysis is confined to four European markets. Broadening the dataset to other major economies like USA, Australia etc would improve the global relevance and strength of segmentation model. Further, model's data was limited to Feb-2025.
